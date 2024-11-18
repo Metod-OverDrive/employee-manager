@@ -1,0 +1,43 @@
+spring:
+  config:
+    import: optional:file:employee-service/.env[.properties]
+  datasource:
+    url: jdbc:postgresql://${HOST}:${POSTGRES_PORT}/${POSTGRES_DATABASE}
+    username: ${POSTGRES_USERNAME}
+    password: ${POSTGRES_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  application:
+    name: employee-service
+  liquibase:
+    change-log: classpath:liquibase/db.changelog.yaml
+    enabled: true
+    default-schema: ${POSTGRES_SCHEMA}
+  kafka:
+    producer:
+      bootstrap-servers: ${KAFKA_HOST}
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      retries: 10
+      acks: 1
+      properties:
+        retry.backoff.ms: 500
+        delivery.timeout.ms: 7500
+        linger.ms: 0
+        request.timeout.ms: 5000
+        enable.idempotence: false
+        max.in.flight.requests.per.connection: 5
+
+security:
+  jwt:
+    secret: ${JWT_SECRET}
+    access: 1
+    refresh: 30
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus
+  endpoint:
+    health:
+      show-details: always

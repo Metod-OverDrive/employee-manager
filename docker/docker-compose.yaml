@@ -1,0 +1,83 @@
+version: '3'
+
+networks:
+  app:
+    driver: bridge
+
+volumes:
+  db-data:
+    driver: local
+  kafka-data:
+    driver: local
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: EmployeeServiceDockerfile
+    networks:
+      - app
+    depends_on:
+      - db
+      - kafka
+    ports:
+      - '8080:8080'
+    env_file: ../employee-service/docker.env
+
+  db:
+    image: postgres:15.1-alpine
+    container_name: postgres
+    networks:
+      - app
+    env_file: .env
+    restart: always
+    environment:
+      - POSTGRES_USER=${POSTGRES_USERNAME}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DATABASE}
+#      - PGDATA=/var/lib/postgresql/data
+    ports:
+      - $DB_LOCAL_PORT:$DB_DOCKER_PORT
+    volumes:
+      - ../employee-service/src/main/resources/preliquibase:/docker-entrypoint-initdb.d
+      - db-data:/var/lib/postgresql/data
+
+  kafka:
+    image: bitnami/kafka:latest
+    ports:
+      - "9092:9092"
+    networks:
+      - app
+    environment:
+      - KAFKA_CFG_NODE_ID=1
+      - KAFKA_KRAFT_CLUSTER_ID=B4Kjl3wASHalC-y3qkRB8Q # скрипт - "kafka-storage.sh random-uuid"
+      - KAFKA_CFG_PROCESS_ROLES=controller,broker
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9091
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9090,CONTROLLER://:9091,EXTERNAL://:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9090,EXTERNAL://${HOSTNAME:-localhost}:9092
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+    volumes:
+      - kafka-data:/bitnami/kafka
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - app
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    networks:
+      - app

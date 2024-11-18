@@ -1,0 +1,14 @@
+FROM maven:3.8.5-openjdk-17 AS build
+WORKDIR /
+COPY /core /core
+RUN cd /core && mvn install && cd ../
+COPY /employee-service /employee-service
+COPY employee-service/pom.xml .
+RUN cd employee-service/ && mvn dependency:go-offline
+COPY employee-service/src /src
+RUN mvn clean package -DskipTests
+
+FROM openjdk:17-jdk-slim
+COPY --from=build /target/*.jar application.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "application.jar"]
